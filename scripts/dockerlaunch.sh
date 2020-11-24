@@ -1,0 +1,1 @@
+docker run --rm -it -v $(pwd):/workspace --gpus all tkdnn:build /bin/bash

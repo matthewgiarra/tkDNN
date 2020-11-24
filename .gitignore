@@ -12,5 +12,7 @@ build/
 *.hdf5
 *.pk
 *.table
+*.mp4
+*.rt
 demo/COCO_val2017
 demo/BDD100K_val

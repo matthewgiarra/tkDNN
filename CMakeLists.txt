@@ -52,6 +52,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${CUDA_INCLUDE_DIRS} ${OPENCV_INCLUDE_DIRS} ${NVINFER_INCLUDES})
 add_library(tkDNN SHARED ${tkdnn_SRC})
 target_link_libraries(tkDNN ${tkdnn_LIBS})
+add_subdirectory(nlohmann_json_cmake_fetchcontent)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
 
 #static 
 #add_library(tkDNN_static STATIC ${tkdnn_SRC})
@@ -112,6 +114,15 @@ target_link_libraries(map_demo tkDNN)
 
 add_executable(demo demo/demo/demo.cpp)
 target_link_libraries(demo tkDNN)
+
+set(DEMO_SRC_DIR  "demo/demo")
+set(CORE_SOURCE_DIR  "src")
+set(TRIMMER_SOURCE
+"${DEMO_SRC_DIR}/trimmer.cpp"
+"${CORE_SOURCE_DIR}/video.cpp")
+set(TRIMMER_APP "trimmer")
+add_executable(${TRIMMER_APP} ${TRIMMER_SOURCE})
+target_link_libraries(${TRIMMER_APP} tkDNN stdc++fs nlohmann_json::nlohmann_json)
 
 #-------------------------------------------------------------------------------
 # Install
