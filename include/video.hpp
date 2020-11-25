@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <vector>
+#include <queue>
 #include <string>
 #include "boost/filesystem.hpp"
 
@@ -11,7 +12,7 @@ class Video
     public:
     bool finished;
     std::string path;
-    std::vector<int> detection_framenums;
+    std::queue<int> detection_framenums;
 
     // Member functions
     Video();

@@ -124,7 +124,8 @@ set(DEMO_SRC_DIR  "demo/demo")
 set(CORE_SOURCE_DIR  "src")
 set(TRIMMER_SOURCE
 "${DEMO_SRC_DIR}/trimmer.cpp"
-"${CORE_SOURCE_DIR}/video.cpp")
+"${CORE_SOURCE_DIR}/video.cpp"
+"${DEMO_SRC_DIR}/trimmerio.cpp")
 set(TRIMMER_APP "trimmer")
 add_executable(${TRIMMER_APP} ${TRIMMER_SOURCE})
 target_link_libraries(${TRIMMER_APP} tkDNN stdc++fs nlohmann_json::nlohmann_json ${Boost_LIBRARIES})

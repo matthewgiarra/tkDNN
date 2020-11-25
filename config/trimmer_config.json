@@ -3,22 +3,35 @@
     {
         "data_dir_host" : "/home/giarrmn1/data",
         "data_dir_container" : "/data",
+        "output_dir_container" : "/data/trimmed_videos",
         "workspace_dir_container" : "/workspace",
         "video_list_path_workspace" : "config/video_list.json",
-        "detector_path_workspace"    : "rt/yolo4_int8.rt"
+        "model_path_workspace" : "rt/yolo4_int8.rt",
+        "output_video_suffix" : "_trimmed"
     },
     
     "classes":
     [
         "person",
-        "car"
+        "car",
+        "motorbike",
+        "truck"
     ],
 
     "options" :
     {
         "frame_step" : 1,
         "write_frames" : false,
-        "write_videos" : true
+        "write_videos" : true,
+        "consolidate_videos" : true,
+        "draw_boxes" : false
+    },
+
+    "parameters":
+    {
+        "batch_size" : 16,
+        "confidence_threshold" : 0.3,
+        "frame_step" : 1
     }
 
 }

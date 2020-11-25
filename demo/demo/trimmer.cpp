@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <mutex>
 #include <fstream>
+#include <string>
+#include <queue>
 
 #include "CenternetDetection.h"
 #include "MobilenetDetection.h"
@@ -11,22 +13,19 @@
 #include "nlohmann/json.hpp"
 #include "constants.hpp"
 #include "video.hpp"
+#include "trimmerio.hpp"
 #include "boost/filesystem.hpp"
 
-bool gRun;
-bool SAVE_RESULT = false;
-
-void sig_handler(int signo) {
-    std::cout<<"request gateway stop\n";
-    gRun = false;
-}
 
 int main(int argc, char *argv[])
 {
 
     std::cout << "HELLO DINGUS" << std::endl;
-    std::cout<<"detection\n";
-    signal(SIGINT, sig_handler);
+    std::cout<<"TRIMMER: Object-detection-based video trimmer\n";
+    
+    // Some hard coded stuff for now
+    char ntype = 'y';
+    int n_classes = 80;
 
     // Print out the input arguments
     for(int i = 0; i < argc; i++)
@@ -34,41 +33,13 @@ int main(int argc, char *argv[])
         std::cout << "argv[" << i << "] = " << argv[i] << std::endl;
     }
 
-    std::string net = "yolo3_berkeley.rt";
-    if(argc > 1)
-        net = argv[1]; 
-    std::string input = "../demo/yolo_test.mp4";
-    if(argc > 2)
-        input = argv[2]; 
-    char ntype = 'y';
-    if(argc > 3)
-        ntype = argv[3][0]; 
-    int n_classes = 80;
-    if(argc > 4)
-        n_classes = atoi(argv[4]); 
-    int n_batch = 1;
-    if(argc > 5)
-        n_batch = atoi(argv[5]); 
-    bool show = true;
-    if(argc > 6)
-        show = atoi(argv[6]); 
-    float conf_thresh=0.3;
-    if(argc > 7)
-        conf_thresh = atof(argv[7]);
-    std::string config_filepath=std::string("config.json");
-    if(argc > 8)
-        config_filepath = std::string(argv[8]);
+    // Path to the config file
+    std::string config_filepath = std::string(argv[1]);
 
-    if(n_batch < 1 || n_batch > 64)
-        FatalError("Batch dim not supported");
-
-    if(!show)
-        SAVE_RESULT = true;
-
+    // Declare some detectors instances 
     tk::dnn::Yolo3Detection yolo;
     tk::dnn::CenternetDetection cnet;
     tk::dnn::MobilenetDetection mbnet;  
-
     tk::dnn::DetectionNN *detNN;  
 
     switch(ntype)
@@ -163,7 +134,12 @@ int main(int argc, char *argv[])
     int num_videos = video_obj_list.size();
 
     // Initialize the network
-    detNN->init(net, n_classes, n_batch, conf_thresh);
+    std::string net = config_data[g_files][g_model_path_workspace];
+    float conf_thresh = config_data[g_parameters][g_confidence_threshold];
+    int batch_size = config_data[g_parameters][g_batch_size];
+    if(batch_size < 1 || batch_size > 64)
+        FatalError("Batch dim not supported");
+    detNN->init(net, n_classes, batch_size, conf_thresh);
     std::cout << "Classes in model: " << std::endl;
     for(int i = 0; i < n_classes; i++){
         std::cout << detNN->classesNames[i] << std::endl;
@@ -195,7 +171,7 @@ int main(int argc, char *argv[])
         
         // Video path as a string
         std::string video_path = video_obj_list[vnum].path;
-        gRun = true;
+        bool gRun = true;
         cv::VideoCapture cap(video_path);
         if(!cap.isOpened())
         {
@@ -209,35 +185,20 @@ int main(int argc, char *argv[])
             image_height = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
         }
             
-        /*
-        cv::VideoWriter resultVideo;
-        if(SAVE_RESULT) {
-            int w = cap.get(cv::CAP_PROP_FRAME_WIDTH);
-            int h = cap.get(cv::CAP_PROP_FRAME_HEIGHT);
-            resultVideo.open("result.mp4", cv::VideoWriter::fourcc('M','P','4','V'), 30, cv::Size(w, h));
-        }
-        */
-
-        cv::Mat frame;
-        if(show)
-        {
-            cv::namedWindow("detection", cv::WINDOW_NORMAL);
-        }
-            
+        // Declare frame holding image data 
+        cv::Mat frame;            
         std::vector<cv::Mat> batch_frame;
         std::vector<cv::Mat> batch_dnn_input;
         tk::dnn::box bbox;
         std::string class_name;
-        // std::vector<int> class_detected_frame_nums;
         
         // Number of batches processed
         int batch_num = 0;
-        
         while(gRun)
         {
             batch_dnn_input.clear();
             batch_frame.clear();
-            for(int bi=0; bi< n_batch; ++bi)
+            for(int bi=0; bi< batch_size; ++bi)
             {
                 cap >> frame; 
                 if(!frame.data)
@@ -261,9 +222,9 @@ int main(int argc, char *argv[])
 
             // A few frames in this batch; need to pad with zeros
             // so the inference doesn't barf on an unexpected batch size
-            if(batch_dnn_input.size() < n_batch)
+            if(batch_dnn_input.size() < batch_size)
             {
-                int batch_deficit = n_batch - batch_dnn_input.size();
+                int batch_deficit = batch_size - batch_dnn_input.size();
                 for(int i = 0; i < batch_deficit; i++)
                 {
                     batch_dnn_input.push_back(cv::Mat::zeros(image_height, image_width, CV_32F));
@@ -271,7 +232,7 @@ int main(int argc, char *argv[])
             }
                 
             // Do the inference
-            detNN->update(batch_dnn_input, n_batch);
+            detNN->update(batch_dnn_input, batch_size);
             detNN->draw(batch_frame);
 
             // Determine if any of the specified classes were detected
@@ -291,9 +252,8 @@ int main(int argc, char *argv[])
                     {
                         if(trimmer_class_nums[j] == bbox.cl)
                         {
-                            int frame_num = batch_num * n_batch + bi;
-                            // class_detected_frame_nums.push_back(frame_num);
-                            video_obj_list[vnum].detection_framenums.push_back(frame_num);
+                            int frame_num = batch_num * batch_size + bi;
+                            video_obj_list[vnum].detection_framenums.push(frame_num);
                             trimmer_classes_detected = true;
                             std::cout << video_path << ": detected " << detNN->classesNames[bbox.cl] << " in frame " << frame_num << std::endl;
                             break;
@@ -305,39 +265,29 @@ int main(int argc, char *argv[])
                         break;
                     }
                 }
-
-                /*
-                if(trimmer_classes_detected && SAVE_RESULT)
-                {
-                    resultVideo << batch_frame[bi];
-                }
-                */
             }
-
-            if(show){
-                for(int bi=0; bi< n_batch; ++bi){
-                    cv::imshow("detection", batch_frame[bi]);
-                    cv::waitKey(1);
-                }
-            }
-            // if(n_batch == 1 && SAVE_RESULT)
-                // resultVideo << frame;
-
+           
             // Increment the number of processed batches
             batch_num++;     
         }
 
+        // Set "finished" field to true for this video
+        video_obj_list[vnum].finished = true;
         std::cout << "Finished detections in " << video_path << std::endl;
+
+        std::cout << "Writing result video for input " << video_path << "..." << std::endl;
+        write_results(video_obj_list[vnum], config_filepath);
+
     }
       
     std::cout<<"Done with batch\n";   
     double mean = 0; 
     
     std::cout<<COL_GREENB<<"\n\nTime stats:\n";
-    std::cout<<"Min: "<<*std::min_element(detNN->stats.begin(), detNN->stats.end())/n_batch<<" ms\n";    
-    std::cout<<"Max: "<<*std::max_element(detNN->stats.begin(), detNN->stats.end())/n_batch<<" ms\n";    
+    std::cout<<"Min: "<<*std::min_element(detNN->stats.begin(), detNN->stats.end())/batch_size<<" ms\n";    
+    std::cout<<"Max: "<<*std::max_element(detNN->stats.begin(), detNN->stats.end())/batch_size<<" ms\n";    
     for(int i=0; i<detNN->stats.size(); i++) mean += detNN->stats[i]; mean /= detNN->stats.size();
-    std::cout<<"Avg: "<<mean/n_batch<<" ms\t"<<1000/(mean/n_batch)<<" FPS\n"<<COL_END;   
+    std::cout<<"Avg: "<<mean/batch_size<<" ms\t"<<1000/(mean/batch_size)<<" FPS\n"<<COL_END; 
     
     return 0;
 }
