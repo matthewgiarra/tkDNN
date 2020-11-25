@@ -9,5 +9,11 @@
  */
 
 const std::string g_classes{"classes"};
+const std::string g_files{"files"};
+const std::string g_data_dir_host{"data_dir_host"};
+const std::string g_data_dir_container{"data_dir_container"};
+const std::string g_workspace_dir_container{"workspace_dir_container"};
+const std::string g_video_list_path_workspace{"video_list_path_workspace"};
+const std::string g_detector_path_workspace{"detector_path_workspace"};
 
 #endif

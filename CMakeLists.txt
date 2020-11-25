@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.5)
 project (tkDNN)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fPIC -Wno-deprecated-declarations -Wno-unused-variable")
+message("CMAKE_CXX_COMPILER_ID: " ${CMAKE_CXX_COMPILER_ID})
+message("CMAKE_CXX_COMPILER_VERSION: " ${CMAKE_CXX_COMPILER_VERSION})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/tkDNN)
 
 # project specific flags
@@ -23,12 +25,15 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --maxrregcount=32)
 find_package(CUDNN REQUIRED)
 include_directories(${CUDNN_INCLUDE_DIR})
 
+find_package(Boost 1.65 REQUIRED COMPONENTS filesystem program_options)
+include_directories(${Boost_INCLUDE_DIRS})
+message("Boost found: " ${Boost_FOUND})
+message("Boost include dirs: " ${Boost_INCLUDE_DIRS})
 
 # compile
 file(GLOB tkdnn_CUSRC "src/kernels/*.cu" "src/sorting.cu")
 cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${CUDA_INCLUDE_DIRS} ${CUDNN_INCLUDE_DIRS})
 cuda_add_library(kernels SHARED ${tkdnn_CUSRC})
-
 
 #-------------------------------------------------------------------------------
 # External Libraries
@@ -122,7 +127,7 @@ set(TRIMMER_SOURCE
 "${CORE_SOURCE_DIR}/video.cpp")
 set(TRIMMER_APP "trimmer")
 add_executable(${TRIMMER_APP} ${TRIMMER_SOURCE})
-target_link_libraries(${TRIMMER_APP} tkDNN stdc++fs nlohmann_json::nlohmann_json)
+target_link_libraries(${TRIMMER_APP} tkDNN stdc++fs nlohmann_json::nlohmann_json ${Boost_LIBRARIES})
 
 #-------------------------------------------------------------------------------
 # Install
